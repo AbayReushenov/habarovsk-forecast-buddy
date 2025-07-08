@@ -1,11 +1,12 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Header } from '@/components/Header';
 import { DataUpload } from '@/components/DataUpload';
 import { SalesChart } from '@/components/SalesChart';
 import { ForecastPanel } from '@/components/ForecastPanel';
 import { MetricsCards } from '@/components/MetricsCards';
 import { RecommendationsPanel } from '@/components/RecommendationsPanel';
+import { SimpleAuth } from '@/components/SimpleAuth';
 import { useToast } from '@/hooks/use-toast';
 
 export interface SalesData {
@@ -29,6 +30,7 @@ export interface Metrics {
 }
 
 const Index = () => {
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [salesData, setSalesData] = useState<SalesData[]>([]);
   const [forecastData, setForecastData] = useState<ForecastData[]>([]);
   const [metrics, setMetrics] = useState<Metrics>({
@@ -40,8 +42,35 @@ const Index = () => {
   const [isGeneratingForecast, setIsGeneratingForecast] = useState(false);
   const { toast } = useToast();
 
+  // Проверяем аутентификацию при загрузке
+  useEffect(() => {
+    const authStatus = localStorage.getItem('demo_authenticated');
+    if (authStatus === 'true') {
+      setIsAuthenticated(true);
+      // Загружаем сохраненные данные
+      loadSavedData();
+    }
+  }, []);
+
+  const loadSavedData = () => {
+    const savedSalesData = localStorage.getItem('sales_data');
+    const savedForecastData = localStorage.getItem('forecast_data');
+    const savedMetrics = localStorage.getItem('metrics');
+
+    if (savedSalesData) {
+      setSalesData(JSON.parse(savedSalesData));
+    }
+    if (savedForecastData) {
+      setForecastData(JSON.parse(savedForecastData));
+    }
+    if (savedMetrics) {
+      setMetrics(JSON.parse(savedMetrics));
+    }
+  };
+
   const handleDataUpload = (data: SalesData[]) => {
     setSalesData(data);
+    localStorage.setItem('sales_data', JSON.stringify(data));
     toast({
       title: "Данные загружены",
       description: `Успешно загружено ${data.length} записей продаж`,
@@ -52,17 +81,42 @@ const Index = () => {
     setIsGeneratingForecast(true);
     
     try {
-      // Имитация генерации прогноза (здесь будет интеграция с GigaChat)
+      // Имитация генерации прогноза с учетом промоций и изменений цен
       await new Promise(resolve => setTimeout(resolve, 2000));
       
-      // Генерируем фиктивные данные прогноза для демонстрации
-      const mockForecast: ForecastData[] = Array.from({ length: 4 }, (_, i) => ({
-        date: new Date(Date.now() + (i + 1) * 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-        predicted_sales: Math.floor(Math.random() * 100) + 50,
-        confidence: Math.random() * 0.3 + 0.7
-      }));
+      // Генерируем более реалистичные данные прогноза
+      const baselineSales = salesData.length > 0 
+        ? salesData.slice(-7).reduce((sum, item) => sum + item.sales_quantity, 0) / 7
+        : 50;
+      
+      const mockForecast: ForecastData[] = Array.from({ length: 4 }, (_, i) => {
+        let adjustedSales = baselineSales;
+        
+        // Учитываем влияние промоций
+        if (promotions.includes('скидка') || promotions.includes('акция')) {
+          adjustedSales *= 1.2; // +20% от промоций
+        }
+        
+        // Учитываем изменения цен
+        if (priceChanges.includes('+')) {
+          adjustedSales *= 0.9; // -10% от роста цен
+        } else if (priceChanges.includes('-')) {
+          adjustedSales *= 1.1; // +10% от снижения цен
+        }
+        
+        // Добавляем сезонность и случайность
+        const seasonalFactor = 1 + Math.sin((i / 4) * Math.PI) * 0.2;
+        const randomFactor = 0.8 + Math.random() * 0.4;
+        
+        return {
+          date: new Date(Date.now() + (i + 1) * 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+          predicted_sales: Math.round(adjustedSales * seasonalFactor * randomFactor),
+          confidence: Math.random() * 0.2 + 0.75
+        };
+      });
       
       setForecastData(mockForecast);
+      localStorage.setItem('forecast_data', JSON.stringify(mockForecast));
       
       // Вычисляем метрики
       const totalForecast = mockForecast.reduce((sum, item) => sum + item.predicted_sales, 0);
@@ -70,16 +124,19 @@ const Index = () => {
       const lastWeekSales = salesData.slice(-7).reduce((sum, item) => sum + item.sales_quantity, 0);
       const trend = lastWeekSales > 0 ? ((avgWeekly - lastWeekSales) / lastWeekSales) * 100 : 0;
       
-      setMetrics({
+      const newMetrics = {
         totalForecastSales: totalForecast,
         avgWeeklySales: avgWeekly,
         trend: trend,
-        accuracy: 85.6
-      });
+        accuracy: 82.5 + Math.random() * 10
+      };
+      
+      setMetrics(newMetrics);
+      localStorage.setItem('metrics', JSON.stringify(newMetrics));
       
       toast({
         title: "Прогноз сгенерирован",
-        description: "Успешно создан прогноз на 4 недели",
+        description: "Успешно создан прогноз на 4 недели с учетом указанных факторов",
       });
     } catch (error) {
       console.error('Ошибка генерации прогноза:', error);
@@ -92,6 +149,14 @@ const Index = () => {
       setIsGeneratingForecast(false);
     }
   };
+
+  const handleAuthentication = () => {
+    setIsAuthenticated(true);
+  };
+
+  if (!isAuthenticated) {
+    return <SimpleAuth onAuthenticated={handleAuthentication} />;
+  }
 
   return (
     <div className="min-h-screen bg-slate-50">

@@ -1,61 +1,69 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Lightbulb, Download, AlertTriangle, TrendingUp, Snowflake } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Lightbulb, TrendingUp, AlertTriangle, CheckCircle, Download } from 'lucide-react';
 
 export const RecommendationsPanel = () => {
   const recommendations = [
     {
-      id: 1,
-      type: 'warning',
-      icon: AlertTriangle,
-      priority: 'Высокий',
-      title: 'Ожидается похолодание',
-      description: 'Прогнозируется снижение температуры на -5°C в следующие 2 недели. Увеличьте запасы на 15%.',
-      action: 'Увеличить заказ'
-    },
-    {
-      id: 2,
       type: 'success',
-      icon: TrendingUp,
-      priority: 'Средний',
-      title: 'Рост продаж',
-      description: 'Модель прогнозирует рост продаж на 12% в декабре. Подготовьте дополнительный персонал.',
-      action: 'Планировать штат'
+      title: 'Увеличить закупки',
+      description: 'Прогноз показывает рост продаж на 15% в следующем месяце',
+      priority: 'high',
+      action: 'Заказать дополнительные 200 единиц SKU001'
     },
     {
-      id: 3,
+      type: 'warning',
+      title: 'Температурная корреляция',
+      description: 'При снижении температуры на 5°C ожидается рост продаж на 12%',
+      priority: 'medium',
+      action: 'Подготовить рекламную кампанию'
+    },
+    {
       type: 'info',
-      icon: Snowflake,
-      priority: 'Низкий',
-      title: 'Сезонная акция',
-      description: 'Рекомендуется запустить акцию "Зимняя распродажа" для увеличения продаж на 8%.',
-      action: 'Создать акцию'
+      title: 'Оптимизация цен',
+      description: 'Рекомендуется снизить цены на 3% для максимизации прибыли',
+      priority: 'low',
+      action: 'Провести A/B тестирование цен'
     }
   ];
 
-  const exportReport = () => {
-    // Здесь будет логика экспорта отчета в PDF
-    console.log('Экспорт отчета в PDF');
+  const getIcon = (type: string) => {
+    switch (type) {
+      case 'success': return <CheckCircle className="h-4 w-4 text-green-500" />;
+      case 'warning': return <AlertTriangle className="h-4 w-4 text-yellow-500" />;
+      default: return <Lightbulb className="h-4 w-4 text-blue-500" />;
+    }
   };
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
-      case 'Высокий': return 'bg-red-100 text-red-700 border-red-200';
-      case 'Средний': return 'bg-yellow-100 text-yellow-700 border-yellow-200';
-      case 'Низкий': return 'bg-blue-100 text-blue-700 border-blue-200';
-      default: return 'bg-gray-100 text-gray-700 border-gray-200';
+      case 'high': return 'bg-red-50 text-red-700 border-red-200';
+      case 'medium': return 'bg-yellow-50 text-yellow-700 border-yellow-200';
+      default: return 'bg-blue-50 text-blue-700 border-blue-200';
     }
   };
 
-  const getIconColor = (type: string) => {
-    switch (type) {
-      case 'warning': return 'text-red-500';
-      case 'success': return 'text-green-500';
-      case 'info': return 'text-blue-500';
-      default: return 'text-gray-500';
-    }
+  const exportReport = () => {
+    const reportData = {
+      generated_at: new Date().toISOString(),
+      recommendations: recommendations,
+      summary: {
+        total_recommendations: recommendations.length,
+        high_priority: recommendations.filter(r => r.priority === 'high').length,
+        medium_priority: recommendations.filter(r => r.priority === 'medium').length,
+        low_priority: recommendations.filter(r => r.priority === 'low').length
+      }
+    };
+
+    const blob = new Blob([JSON.stringify(reportData, null, 2)], { type: 'application/json' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `forecast_report_${new Date().toISOString().split('T')[0]}.json`;
+    a.click();
+    window.URL.revokeObjectURL(url);
   };
 
   return (
@@ -63,60 +71,55 @@ export const RecommendationsPanel = () => {
       <CardHeader>
         <CardTitle className="flex items-center justify-between">
           <div className="flex items-center space-x-2">
-            <Lightbulb className="h-5 w-5 text-yellow-500" />
+            <TrendingUp className="h-5 w-5 text-accent" />
             <span>Рекомендации</span>
           </div>
-          <Button
-            variant="outline"
+          <Button 
+            variant="outline" 
             size="sm"
             onClick={exportReport}
-            className="hidden sm:flex"
+            className="text-xs"
           >
-            <Download className="h-4 w-4 mr-2" />
-            PDF отчет
+            <Download className="h-3 w-3 mr-1" />
+            Отчет
           </Button>
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        {recommendations.map((rec) => {
-          const IconComponent = rec.icon;
-          return (
-            <div key={rec.id} className="border border-slate-200 rounded-lg p-3 space-y-2">
-              {/* Заголовок с иконкой и приоритетом */}
-              <div className="flex items-start justify-between">
-                <div className="flex items-center space-x-2">
-                  <IconComponent className={`h-4 w-4 ${getIconColor(rec.type)}`} />
-                  <h4 className="text-sm font-medium">{rec.title}</h4>
-                </div>
-                <Badge className={`text-xs ${getPriorityColor(rec.priority)}`}>
-                  {rec.priority}
-                </Badge>
+        {recommendations.map((rec, index) => (
+          <div key={index} className="border rounded-lg p-3 space-y-2">
+            <div className="flex items-start justify-between">
+              <div className="flex items-center space-x-2">
+                {getIcon(rec.type)}
+                <h4 className="font-medium text-sm">{rec.title}</h4>
               </div>
-
-              {/* Описание */}
-              <p className="text-sm text-slate-600 leading-relaxed">
-                {rec.description}
-              </p>
-
-              {/* Действие */}
-              <Button variant="outline" size="sm" className="w-full">
-                {rec.action}
-              </Button>
+              <Badge 
+                variant="outline" 
+                className={`text-xs ${getPriorityColor(rec.priority)}`}
+              >
+                {rec.priority === 'high' ? 'Высокий' : rec.priority === 'medium' ? 'Средний' : 'Низкий'}
+              </Badge>
             </div>
-          );
-        })}
+            
+            <p className="text-xs text-slate-600">
+              {rec.description}
+            </p>
+            
+            <div className="bg-slate-50 p-2 rounded text-xs">
+              <span className="font-medium">Действие: </span>
+              {rec.action}
+            </div>
+          </div>
+        ))}
 
-        {/* Общие рекомендации */}
-        <div className="bg-slate-50 p-3 rounded-lg space-y-2">
-          <h4 className="text-sm font-medium flex items-center space-x-2">
-            <Lightbulb className="h-4 w-4 text-yellow-500" />
-            <span>Общие советы</span>
-          </h4>
-          <ul className="text-xs text-slate-600 space-y-1 list-disc list-inside">
-            <li>Отслеживайте прогноз погоды еженедельно</li>
-            <li>Корректируйте закупки за 2 недели до похолодания</li>
-            <li>Используйте акции при прогнозируемом снижении продаж</li>
-            <li>Анализируйте точность прогнозов для улучшения модели</li>
+        {/* Дополнительная информация */}
+        <div className="text-xs text-slate-600 bg-slate-50 p-3 rounded">
+          <p className="font-medium mb-1">Факторы анализа:</p>
+          <ul className="space-y-1 list-disc list-inside">
+            <li>Сезонные тренды продаж</li>
+            <li>Корреляция с температурой</li>
+            <li>Эффективность промо-акций</li>
+            <li>Динамика цен конкурентов</li>
           </ul>
         </div>
       </CardContent>

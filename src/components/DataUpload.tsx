@@ -1,6 +1,6 @@
 
 import { useState, useCallback } from 'react';
-import { Upload, FileText, CheckCircle, AlertCircle } from 'lucide-react';
+import { Upload, FileText, CheckCircle, AlertCircle, Download } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
@@ -68,7 +68,7 @@ export const DataUpload = ({ onDataUpload }: DataUploadProps) => {
       const parsedData = parseCSV(text);
       const validatedData = validateCsvData(parsedData);
       
-      setPreviewData(validatedData.slice(0, 5)); // Показываем только первые 5 строк
+      setPreviewData(validatedData.slice(0, 5));
       setIsValidData(true);
       setUploadedFile(file);
       
@@ -134,12 +134,40 @@ export const DataUpload = ({ onDataUpload }: DataUploadProps) => {
     }
   };
 
+  const downloadTemplate = () => {
+    const template = `date,sku_id,sales_quantity,avg_temp
+2024-01-01,SKU001,15,-12.5
+2024-01-02,SKU001,22,-8.3
+2024-01-03,SKU002,18,-15.2
+2024-01-04,SKU001,28,-20.1
+2024-01-05,SKU002,12,-5.7`;
+    
+    const blob = new Blob([template], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'sales_data_template.csv';
+    a.click();
+    window.URL.revokeObjectURL(url);
+  };
+
   return (
     <Card className="w-full">
       <CardHeader>
-        <CardTitle className="flex items-center space-x-2">
-          <Upload className="h-5 w-5 text-primary" />
-          <span>Загрузка данных</span>
+        <CardTitle className="flex items-center justify-between">
+          <div className="flex items-center space-x-2">
+            <Upload className="h-5 w-5 text-primary" />
+            <span>Загрузка данных</span>
+          </div>
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={downloadTemplate}
+            className="text-xs"
+          >
+            <Download className="h-3 w-3 mr-1" />
+            Шаблон
+          </Button>
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
