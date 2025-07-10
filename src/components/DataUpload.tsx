@@ -4,6 +4,7 @@ import { Upload, FileText, CheckCircle, AlertCircle, Download } from 'lucide-rea
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
+import { useUploadCsvFile, useDownloadSample } from '@/hooks/useApi';
 import { SalesData } from '@/pages/Index';
 
 interface DataUploadProps {
@@ -17,33 +18,50 @@ export const DataUpload = ({ onDataUpload }: DataUploadProps) => {
   const [isValidData, setIsValidData] = useState<boolean | null>(null);
   const { toast } = useToast();
 
-  const validateCsvData = (data: any[]): SalesData[] => {
-    const requiredColumns = ['date', 'sku_id', 'sales_quantity', 'avg_temp'];
-    
+  // API hooks
+  const uploadMutation = useUploadCsvFile();
+  const downloadMutation = useDownloadSample();
+
+    const validateCsvData = (data: any[]): SalesData[] => {
+    // Support both old format and new backend format
+    const requiredColumnsOld = ['date', 'sku_id', 'sales_quantity', 'avg_temp'];
+    const requiredColumnsNew = ['sku_id', 'date', 'units_sold', 'weather_temp'];
+
     if (data.length === 0) {
       throw new Error('Файл пустой');
     }
 
     const firstRow = data[0];
-    const missingColumns = requiredColumns.filter(col => !(col in firstRow));
-    
-    if (missingColumns.length > 0) {
-      throw new Error(`Отсутствуют обязательные колонки: ${missingColumns.join(', ')}`);
+    const hasOldFormat = requiredColumnsOld.every(col => col in firstRow);
+    const hasNewFormat = requiredColumnsNew.every(col => col in firstRow);
+
+    if (!hasOldFormat && !hasNewFormat) {
+      throw new Error(`Нужные колонки: ${requiredColumnsNew.join(', ')} или ${requiredColumnsOld.join(', ')}`);
     }
 
     return data.map((row, index) => {
-      const salesQuantity = parseInt(row.sales_quantity);
-      const avgTemp = parseFloat(row.avg_temp);
-      
-      if (isNaN(salesQuantity) || isNaN(avgTemp)) {
-        throw new Error(`Некорректные данные в строке ${index + 1}`);
+      let salesQuantity: number;
+      let avgTemp: number;
+
+      if (hasNewFormat) {
+        // New backend format
+        salesQuantity = parseInt(row.units_sold);
+        avgTemp = row.weather_temp ? parseFloat(row.weather_temp) : 0;
+      } else {
+        // Old format
+        salesQuantity = parseInt(row.sales_quantity);
+        avgTemp = parseFloat(row.avg_temp);
+      }
+
+      if (isNaN(salesQuantity)) {
+        throw new Error(`Некорректные данные продаж в строке ${index + 1}`);
       }
 
       return {
         date: row.date,
         sku_id: row.sku_id,
         sales_quantity: salesQuantity,
-        avg_temp: avgTemp
+        avg_temp: avgTemp || 0
       };
     });
   };
@@ -51,7 +69,7 @@ export const DataUpload = ({ onDataUpload }: DataUploadProps) => {
   const parseCSV = (text: string): any[] => {
     const lines = text.trim().split('\n');
     const headers = lines[0].split(',').map(h => h.trim());
-    
+
     return lines.slice(1).map(line => {
       const values = line.split(',').map(v => v.trim());
       const obj: any = {};
@@ -67,11 +85,11 @@ export const DataUpload = ({ onDataUpload }: DataUploadProps) => {
       const text = await file.text();
       const parsedData = parseCSV(text);
       const validatedData = validateCsvData(parsedData);
-      
+
       setPreviewData(validatedData.slice(0, 5));
       setIsValidData(true);
       setUploadedFile(file);
-      
+
       toast({
         title: "Файл загружен",
         description: `Найдено ${validatedData.length} записей. Проверьте данные перед сохранением.`,
@@ -90,7 +108,7 @@ export const DataUpload = ({ onDataUpload }: DataUploadProps) => {
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     setIsDragOver(false);
-    
+
     const file = e.dataTransfer.files[0];
     if (file && file.type === 'text/csv') {
       handleFileUpload(file);
@@ -110,15 +128,19 @@ export const DataUpload = ({ onDataUpload }: DataUploadProps) => {
     }
   };
 
-  const saveData = async () => {
+    const saveData = async () => {
     if (uploadedFile && isValidData) {
       try {
+        // Upload file to API
+        uploadMutation.mutate(uploadedFile);
+
+        // Also parse for local preview (fallback)
         const text = await uploadedFile.text();
         const parsedData = parseCSV(text);
         const validatedData = validateCsvData(parsedData);
-        
+
         onDataUpload(validatedData);
-        
+
         // Сброс состояния
         setUploadedFile(null);
         setPreviewData([]);
@@ -134,21 +156,9 @@ export const DataUpload = ({ onDataUpload }: DataUploadProps) => {
     }
   };
 
-  const downloadTemplate = () => {
-    const template = `date,sku_id,sales_quantity,avg_temp
-2024-01-01,SKU001,15,-12.5
-2024-01-02,SKU001,22,-8.3
-2024-01-03,SKU002,18,-15.2
-2024-01-04,SKU001,28,-20.1
-2024-01-05,SKU002,12,-5.7`;
-    
-    const blob = new Blob([template], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'sales_data_template.csv';
-    a.click();
-    window.URL.revokeObjectURL(url);
+    const downloadTemplate = () => {
+    // Try to download from API first
+    downloadMutation.mutate();
   };
 
   return (
@@ -159,8 +169,8 @@ export const DataUpload = ({ onDataUpload }: DataUploadProps) => {
             <Upload className="h-5 w-5 text-primary" />
             <span>Загрузка данных</span>
           </div>
-          <Button 
-            variant="outline" 
+          <Button
+            variant="outline"
             size="sm"
             onClick={downloadTemplate}
             className="text-xs"
@@ -174,11 +184,11 @@ export const DataUpload = ({ onDataUpload }: DataUploadProps) => {
         {/* Зона загрузки */}
         <div
           className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
-            isDragOver 
-              ? 'border-primary bg-primary/5' 
-              : isValidData === true 
-                ? 'border-green-300 bg-green-50' 
-                : isValidData === false 
+            isDragOver
+              ? 'border-primary bg-primary/5'
+              : isValidData === true
+                ? 'border-green-300 bg-green-50'
+                : isValidData === false
                   ? 'border-red-300 bg-red-50'
                   : 'border-slate-300 hover:border-primary/50'
           }`}
@@ -193,7 +203,7 @@ export const DataUpload = ({ onDataUpload }: DataUploadProps) => {
             className="hidden"
             id="csv-upload"
           />
-          
+
           <label htmlFor="csv-upload" className="cursor-pointer">
             <div className="space-y-2">
               {isValidData === true ? (
@@ -203,7 +213,7 @@ export const DataUpload = ({ onDataUpload }: DataUploadProps) => {
               ) : (
                 <FileText className="h-8 w-8 text-slate-400 mx-auto" />
               )}
-              
+
               <div>
                 <p className="text-sm font-medium">
                   {uploadedFile ? uploadedFile.name : 'Перетащите CSV файл сюда'}
@@ -219,7 +229,8 @@ export const DataUpload = ({ onDataUpload }: DataUploadProps) => {
         {/* Формат данных */}
         <div className="text-xs text-slate-600 bg-slate-50 p-3 rounded">
           <p className="font-medium mb-1">Формат CSV:</p>
-          <p>date, sku_id, sales_quantity, avg_temp</p>
+          <p>sku_id, date, units_sold, revenue, weather_temp, season</p>
+          <p className="text-slate-500 mt-1">или: date, sku_id, sales_quantity, avg_temp</p>
         </div>
 
         {/* Предпросмотр данных */}
@@ -239,13 +250,14 @@ export const DataUpload = ({ onDataUpload }: DataUploadProps) => {
           </div>
         )}
 
-        {/* Кнопка сохранения */}
+                {/* Кнопка сохранения */}
         {isValidData && uploadedFile && (
-          <Button 
-            onClick={saveData} 
+          <Button
+            onClick={saveData}
             className="w-full animate-pulse-glow"
+            disabled={uploadMutation.isPending}
           >
-            Сохранить данные
+            {uploadMutation.isPending ? 'Загрузка...' : 'Сохранить данные'}
           </Button>
         )}
       </CardContent>

@@ -7,7 +7,13 @@ import { ForecastPanel } from '@/components/ForecastPanel';
 import { MetricsCards } from '@/components/MetricsCards';
 import { RecommendationsPanel } from '@/components/RecommendationsPanel';
 import { SimpleAuth } from '@/components/SimpleAuth';
+import { ApiStatus } from '@/components/ApiStatus';
 import { useToast } from '@/hooks/use-toast';
+import {
+  useHealth,
+  useGenerateForecast
+} from '@/hooks/useApi';
+import { SalesData as ApiSalesData } from '@/lib/api';
 
 export interface SalesData {
   date: string;
@@ -39,8 +45,11 @@ const Index = () => {
     trend: 0,
     accuracy: 0
   });
-  const [isGeneratingForecast, setIsGeneratingForecast] = useState(false);
   const { toast } = useToast();
+
+  // API hooks
+  const { data: healthData } = useHealth();
+  const generateForecastMutation = useGenerateForecast();
 
   // Проверяем аутентификацию при загрузке
   useEffect(() => {
@@ -68,87 +77,59 @@ const Index = () => {
     }
   };
 
-  const handleDataUpload = (data: SalesData[]) => {
+    const handleDataUpload = (data: SalesData[]) => {
+    // Keep local data for immediate UI update
+    // API upload is handled directly in DataUpload component
     setSalesData(data);
     localStorage.setItem('sales_data', JSON.stringify(data));
-    toast({
-      title: "Данные загружены",
-      description: `Успешно загружено ${data.length} записей продаж`,
+  };
+
+    const generateForecast = async (promotions: string, priceChanges: string) => {
+    // Use API to generate forecast
+    generateForecastMutation.mutate({
+      period_days: 30, // Generate 30-day forecast
+      promotions: promotions || undefined,
+      price_changes: priceChanges || undefined,
     });
   };
 
-  const generateForecast = async (promotions: string, priceChanges: string) => {
-    setIsGeneratingForecast(true);
-    
-    try {
-      // Имитация генерации прогноза с учетом промоций и изменений цен
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      // Генерируем более реалистичные данные прогноза
-      const baselineSales = salesData.length > 0 
-        ? salesData.slice(-7).reduce((sum, item) => sum + item.sales_quantity, 0) / 7
-        : 50;
-      
-      const mockForecast: ForecastData[] = Array.from({ length: 4 }, (_, i) => {
-        let adjustedSales = baselineSales;
-        
-        // Учитываем влияние промоций
-        if (promotions.includes('скидка') || promotions.includes('акция')) {
-          adjustedSales *= 1.2; // +20% от промоций
-        }
-        
-        // Учитываем изменения цен
-        if (priceChanges.includes('+')) {
-          adjustedSales *= 0.9; // -10% от роста цен
-        } else if (priceChanges.includes('-')) {
-          adjustedSales *= 1.1; // +10% от снижения цен
-        }
-        
-        // Добавляем сезонность и случайность
-        const seasonalFactor = 1 + Math.sin((i / 4) * Math.PI) * 0.2;
-        const randomFactor = 0.8 + Math.random() * 0.4;
-        
-        return {
-          date: new Date(Date.now() + (i + 1) * 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-          predicted_sales: Math.round(adjustedSales * seasonalFactor * randomFactor),
-          confidence: Math.random() * 0.2 + 0.75
-        };
-      });
-      
-      setForecastData(mockForecast);
-      localStorage.setItem('forecast_data', JSON.stringify(mockForecast));
-      
-      // Вычисляем метрики
-      const totalForecast = mockForecast.reduce((sum, item) => sum + item.predicted_sales, 0);
-      const avgWeekly = totalForecast / 4;
-      const lastWeekSales = salesData.slice(-7).reduce((sum, item) => sum + item.sales_quantity, 0);
-      const trend = lastWeekSales > 0 ? ((avgWeekly - lastWeekSales) / lastWeekSales) * 100 : 0;
-      
-      const newMetrics = {
-        totalForecastSales: totalForecast,
-        avgWeeklySales: avgWeekly,
+    // Handle successful forecast generation
+  useEffect(() => {
+    if (generateForecastMutation.data) {
+      const result = generateForecastMutation.data;
+
+      // Convert backend format to frontend format
+      const convertedForecast: ForecastData[] = result.predictions.map(pred => ({
+        date: pred.date,
+        predicted_sales: pred.predicted_units,
+        confidence: pred.confidence,
+      }));
+
+      // Calculate metrics from response
+      const avgDailySales = result.total_predicted_units / result.forecast_period;
+      const trend = salesData.length > 0 ?
+        ((avgDailySales - salesData.slice(-7).reduce((sum, item) => sum + item.sales_quantity, 0) / 7) /
+         (salesData.slice(-7).reduce((sum, item) => sum + item.sales_quantity, 0) / 7)) * 100 : 0;
+
+      // Update local state with API response
+      setForecastData(convertedForecast);
+      setMetrics({
+        totalForecastSales: result.total_predicted_units,
+        avgWeeklySales: avgDailySales * 7,
         trend: trend,
-        accuracy: 82.5 + Math.random() * 10
-      };
-      
-      setMetrics(newMetrics);
-      localStorage.setItem('metrics', JSON.stringify(newMetrics));
-      
-      toast({
-        title: "Прогноз сгенерирован",
-        description: "Успешно создан прогноз на 4 недели с учетом указанных факторов",
+        accuracy: result.average_confidence * 100,
       });
-    } catch (error) {
-      console.error('Ошибка генерации прогноза:', error);
-      toast({
-        title: "Ошибка",
-        description: "Не удалось сгенерировать прогноз. Попробуйте еще раз.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsGeneratingForecast(false);
+
+      // Save to localStorage for persistence
+      localStorage.setItem('forecast_data', JSON.stringify(convertedForecast));
+      localStorage.setItem('metrics', JSON.stringify({
+        totalForecastSales: result.total_predicted_units,
+        avgWeeklySales: avgDailySales * 7,
+        trend: trend,
+        accuracy: result.average_confidence * 100,
+      }));
     }
-  };
+  }, [generateForecastMutation.data, salesData]);
 
   const handleAuthentication = () => {
     setIsAuthenticated(true);
@@ -161,7 +142,7 @@ const Index = () => {
   return (
     <div className="min-h-screen bg-slate-50">
       <Header />
-      
+
       <main className="container mx-auto px-4 py-6 space-y-6">
         {/* Заголовок */}
         <div className="text-center space-y-2 animate-fade-in">
@@ -175,23 +156,24 @@ const Index = () => {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           {/* Левая колонка - Загрузка данных */}
           <div className="lg:col-span-3 space-y-6">
+            <ApiStatus />
             <DataUpload onDataUpload={handleDataUpload} />
             <MetricsCards metrics={metrics} />
           </div>
 
           {/* Центральная колонка - График */}
           <div className="lg:col-span-6">
-            <SalesChart 
-              salesData={salesData} 
+            <SalesChart
+              salesData={salesData}
               forecastData={forecastData}
             />
           </div>
 
           {/* Правая колонка - Управление и отчеты */}
           <div className="lg:col-span-3 space-y-6">
-            <ForecastPanel 
+                        <ForecastPanel
               onGenerateForecast={generateForecast}
-              isGenerating={isGeneratingForecast}
+              isGenerating={generateForecastMutation.isPending}
             />
             <RecommendationsPanel />
           </div>
