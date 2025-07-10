@@ -22,7 +22,7 @@ export const DataUpload = ({ onDataUpload }: DataUploadProps) => {
   const uploadMutation = useUploadCsvFile();
   const downloadMutation = useDownloadSample();
 
-    const validateCsvData = (data: any[]): SalesData[] => {
+  const validateCsvData = (data: any[]): SalesData[] => {
     // Support both old format and new backend format
     const requiredColumnsOld = ['date', 'sku_id', 'sales_quantity', 'avg_temp'];
     const requiredColumnsNew = ['sku_id', 'date', 'units_sold', 'weather_temp'];
@@ -128,7 +128,7 @@ export const DataUpload = ({ onDataUpload }: DataUploadProps) => {
     }
   };
 
-    const saveData = async () => {
+  const saveData = async () => {
     if (uploadedFile && isValidData) {
       try {
         // Upload file to API
@@ -156,7 +156,7 @@ export const DataUpload = ({ onDataUpload }: DataUploadProps) => {
     }
   };
 
-    const downloadTemplate = () => {
+  const downloadTemplate = () => {
     // Try to download from API first
     downloadMutation.mutate();
   };
@@ -250,7 +250,7 @@ export const DataUpload = ({ onDataUpload }: DataUploadProps) => {
           </div>
         )}
 
-                {/* Кнопка сохранения */}
+        {/* Кнопка сохранения */}
         {isValidData && uploadedFile && (
           <Button
             onClick={saveData}
