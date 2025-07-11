@@ -135,7 +135,9 @@ const Index = () => {
                 }
                 const weekSales = slice.reduce((sum, cur) => sum + convertToSales(cur), 0)
                 const avgConfidence = slice.reduce((sum, cur) => sum + (cur.confidence ?? 0), 0) / slice.length
-                const avgTemp = slice.reduce((sum, cur) => sum + ((cur as any).predicted_temp ?? 0), 0) / slice.length
+                const avgTempRaw =
+                    slice.reduce((sum, cur) => sum + ((cur as any).predicted_temp ?? 0), 0) / slice.length
+                const avgTemp = Number.isFinite(avgTempRaw) ? Math.round(avgTempRaw * 10) / 10 : undefined
                 let weekDate = new Date(slice[0].date)
                 const lastSalesDate = salesData.length > 0 ? new Date(salesData[salesData.length - 1].date) : null
                 if (lastSalesDate && weekDate <= lastSalesDate) {
@@ -147,7 +149,7 @@ const Index = () => {
                     date: weekDate.toISOString().split('T')[0], // ISO yyyy-mm-dd
                     predicted_sales: weekSales,
                     confidence: avgConfidence,
-                    predicted_temp: Number.isFinite(avgTemp) ? avgTemp : undefined,
+                    predicted_temp: avgTemp,
                 })
             }
 
