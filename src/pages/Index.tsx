@@ -118,42 +118,56 @@ const Index = () => {
     // Handle successful forecast generation
   useEffect(() => {
     if (generateForecastMutation.data) {
-      const result = generateForecastMutation.data;
+        const result = generateForecastMutation.data
 
-      // Convert backend format to frontend format
-      const convertedForecast: ForecastData[] = result.predictions.map((pred) => ({
-          date: pred.date,
-          predicted_sales: (pred as any).predicted_sales ?? (pred as any).predicted_units ?? (pred as any).sales ?? 0,
-          confidence: pred.confidence,
-      }))
+        // Convert backend format to weekly aggregated forecast format
+        const convertToSales = (p: any) => p?.predicted_sales ?? p?.predicted_units ?? p?.sales ?? 0
+        const weeklyForecast: ForecastData[] = []
+        for (let i = 0; i < result.predictions.length; i += 7) {
+            const slice = result.predictions.slice(i, i + 7)
+            if (slice.length === 0) continue
+            const weekSales = slice.reduce((sum, cur) => sum + convertToSales(cur), 0)
+            const avgConfidence = slice.reduce((sum, cur) => sum + (cur.confidence ?? 0), 0) / slice.length
+            weeklyForecast.push({
+                date: slice[0].date, // первая дата недели
+                predicted_sales: weekSales,
+                confidence: avgConfidence,
+            })
+        }
 
-      // Calculate metrics from response
-      const totalForecastUnits = (result as any).total_predicted_sales ?? (result as any).total_predicted_units ?? 0
-      const avgDailySales = totalForecastUnits / result.forecast_period
-      const trend = salesData.length > 0 ?
-        ((avgDailySales - salesData.slice(-7).reduce((sum, item) => sum + item.sales_quantity, 0) / 7) /
-         (salesData.slice(-7).reduce((sum, item) => sum + item.sales_quantity, 0) / 7)) * 100 : 0;
+        // Use aggregated forecast for UI
+        const convertedForecast: ForecastData[] = weeklyForecast
 
-      // Update local state with API response
-      setForecastData(convertedForecast);
-      setMetrics({
-          totalForecastSales: totalForecastUnits,
-          avgWeeklySales: avgDailySales * 7,
-          trend: trend,
-          accuracy: result.average_confidence * 100,
-      })
+        // Calculate metrics from response
+        const totalForecastUnits = (result as any).total_predicted_sales ?? (result as any).total_predicted_units ?? 0
+        const avgDailySales = totalForecastUnits / result.forecast_period
+        const trend =
+            salesData.length > 0
+                ? ((avgDailySales - salesData.slice(-7).reduce((sum, item) => sum + item.sales_quantity, 0) / 7) /
+                      (salesData.slice(-7).reduce((sum, item) => sum + item.sales_quantity, 0) / 7)) *
+                  100
+                : 0
 
-      // Save to localStorage for persistence
-      localStorage.setItem('forecast_data', JSON.stringify(convertedForecast));
-      localStorage.setItem(
-          'metrics',
-          JSON.stringify({
-              totalForecastSales: totalForecastUnits,
-              avgWeeklySales: avgDailySales * 7,
-              trend: trend,
-              accuracy: result.average_confidence * 100,
-          })
-      )
+        // Update local state with API response
+        setForecastData(convertedForecast)
+        setMetrics({
+            totalForecastSales: totalForecastUnits,
+            avgWeeklySales: avgDailySales * 7,
+            trend: trend,
+            accuracy: result.average_confidence * 100,
+        })
+
+        // Save to localStorage for persistence
+        localStorage.setItem('forecast_data', JSON.stringify(convertedForecast))
+        localStorage.setItem(
+            'metrics',
+            JSON.stringify({
+                totalForecastSales: totalForecastUnits,
+                avgWeeklySales: avgDailySales * 7,
+                trend: trend,
+                accuracy: result.average_confidence * 100,
+            })
+        )
     }
   }, [generateForecastMutation.data, salesData]);
 
