@@ -82,26 +82,25 @@ export const DataUpload = ({ onDataUpload }: DataUploadProps) => {
 
   const handleFileUpload = useCallback(async (file: File) => {
     try {
-      const text = await file.text();
-      const parsedData = parseCSV(text);
-      const validatedData = validateCsvData(parsedData);
+        const text = await file.text()
+        const parsedData = parseCSV(text)
+        const validatedData = validateCsvData(parsedData)
 
-      setPreviewData(validatedData.slice(0, 5));
-      setIsValidData(true);
-      setUploadedFile(file);
+        setPreviewData(validatedData.slice(0, 5))
+        setIsValidData(true)
+        setUploadedFile(file)
 
-      toast({
-        title: "Файл загружен",
-        description: `Найдено ${validatedData.length} записей. Проверьте данные перед сохранением.`,
-      });
+        toast({
+            title: 'Файл загружен',
+            description: `Найдено ${validatedData.length} записей. Проверьте данные перед сохранением.`,
+        })
     } catch (error) {
-      console.error('Ошибка валидации файла:', error);
-      setIsValidData(false);
-      toast({
-        title: "Ошибка валидации",
-        description: error instanceof Error ? error.message : "Некорректный формат файла",
-        variant: "destructive",
-      });
+        setIsValidData(false)
+        toast({
+            title: 'Ошибка валидации',
+            description: error instanceof Error ? error.message : 'Некорректный формат файла',
+            variant: 'destructive',
+        })
     }
   }, [toast]);
 
@@ -131,27 +130,26 @@ export const DataUpload = ({ onDataUpload }: DataUploadProps) => {
   const saveData = async () => {
     if (uploadedFile && isValidData) {
       try {
-        // Upload file to API
-        uploadMutation.mutate(uploadedFile);
+          // Upload file to API
+          uploadMutation.mutate(uploadedFile)
 
-        // Also parse for local preview (fallback)
-        const text = await uploadedFile.text();
-        const parsedData = parseCSV(text);
-        const validatedData = validateCsvData(parsedData);
+          // Also parse for local preview (fallback)
+          const text = await uploadedFile.text()
+          const parsedData = parseCSV(text)
+          const validatedData = validateCsvData(parsedData)
 
-        onDataUpload(validatedData);
+          onDataUpload(validatedData)
 
-        // Сброс состояния
-        setUploadedFile(null);
-        setPreviewData([]);
-        setIsValidData(null);
+          // Сброс состояния
+          setUploadedFile(null)
+          setPreviewData([])
+          setIsValidData(null)
       } catch (error) {
-        console.error('Ошибка сохранения данных:', error);
-        toast({
-          title: "Ошибка сохранения",
-          description: "Не удалось сохранить данные",
-          variant: "destructive",
-        });
+          toast({
+              title: 'Ошибка сохранения',
+              description: 'Не удалось сохранить данные',
+              variant: 'destructive',
+          })
       }
     }
   };

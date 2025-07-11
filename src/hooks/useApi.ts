@@ -24,96 +24,93 @@ export const useHealth = () => {
 
 // Upload CSV file mutation
 export const useUploadCsvFile = () => {
-  const { toast } = useToast();
-  const queryClient = useQueryClient();
+    const { toast } = useToast()
+    const queryClient = useQueryClient()
 
-  return useMutation({
-    mutationFn: (file: File) => apiService.uploadCsvFile(file),
-    onSuccess: (result) => {
-      toast({
-        title: "Данные загружены",
-        description: `Успешно загружено ${result.rows_processed} записей продаж`,
-      });
-      // Invalidate forecast queries to refetch with new data
-      queryClient.invalidateQueries({ queryKey: ['forecast'] });
-    },
-    onError: (error) => {
-      console.error('Upload error:', error);
-      toast({
-        title: "Ошибка загрузки",
-        description: "Не удалось загрузить данные. Попробуйте еще раз.",
-        variant: "destructive",
-      });
-    },
-  });
-};
+    return useMutation({
+        mutationFn: (file: File) => apiService.uploadCsvFile(file),
+        onSuccess: (result) => {
+            toast({
+                title: 'Данные загружены',
+                description: `Успешно загружено ${result.rows_processed} записей продаж`,
+            })
+            // Invalidate forecast queries to refetch with new data
+            queryClient.invalidateQueries({ queryKey: ['forecast'] })
+        },
+        onError: (error) => {
+            toast({
+                title: 'Ошибка загрузки',
+                description: 'Не удалось загрузить данные. Попробуйте еще раз.',
+                variant: 'destructive',
+            })
+        },
+    })
+}
 
 // Generate forecast mutation
 export const useGenerateForecast = () => {
-  const { toast } = useToast();
-  const queryClient = useQueryClient();
+    const { toast } = useToast()
+    const queryClient = useQueryClient()
 
-  return useMutation({
-    mutationFn: (request: ForecastRequest) => apiService.generateForecast(request),
-    onSuccess: (result) => {
-      toast({
-        title: "Прогноз сгенерирован",
-        description: `Создан прогноз на ${result.forecast.length} дней с учетом указанных факторов`,
-      });
-      // Cache the result
-      queryClient.setQueryData(['forecast', 'custom'], result);
-    },
-    onError: (error) => {
-      console.error('Forecast generation error:', error);
-      toast({
-        title: "Ошибка генерации прогноза",
-        description: "Не удалось сгенерировать прогноз. Попробуйте еще раз.",
-        variant: "destructive",
-      });
-    },
-  });
-};
+    return useMutation({
+        mutationFn: (request: ForecastRequest) => apiService.generateForecast(request),
+        onSuccess: (result) => {
+            toast({
+                title: 'Прогноз сгенерирован',
+                description: `Создан прогноз на ${result.predictions.length} дней с учетом указанных факторов`,
+            })
+            // Cache the result
+            queryClient.setQueryData(['forecast', 'custom'], result)
+        },
+        onError: (error) => {
+            toast({
+                title: 'Ошибка генерации прогноза',
+                description: 'Не удалось сгенерировать прогноз. Попробуйте еще раз.',
+                variant: 'destructive',
+            })
+        },
+    })
+}
 
 // Get sales data hook
 export const useSalesData = (skuId: string, limit: number = 52, enabled: boolean = true) => {
-  return useQuery({
-    queryKey: ['salesData', skuId, limit],
-    queryFn: () => apiService.getSalesData(skuId, limit),
-    enabled,
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    retry: 2,
-  });
-};
+    return useQuery({
+        queryKey: ['salesData', skuId, limit],
+        queryFn: () => apiService.getSalesData(skuId, limit),
+        enabled,
+        staleTime: 5 * 60 * 1000, // 5 minutes
+        retry: 2,
+    })
+}
 
 // Download sample CSV hook
 export const useDownloadSample = () => {
-  const { toast } = useToast();
+    const { toast } = useToast()
 
-  return useMutation({
-    mutationFn: () => apiService.downloadSampleCsv(),
-    onSuccess: (blob) => {
-      // Create download link
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = 'sample_sales_data.csv';
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.URL.revokeObjectURL(url);
+    return useMutation({
+        mutationFn: () => apiService.downloadSampleCsv(),
+        onSuccess: (blob) => {
+            // Create download link
+            const url = window.URL.createObjectURL(blob)
+            const link = document.createElement('a')
+            link.href = url
+            link.download = 'sample_sales_data.csv'
+            document.body.appendChild(link)
+            link.click()
+            link.remove()
+            window.URL.revokeObjectURL(url)
 
-      toast({
-        title: "Файл загружен",
-        description: "Образец CSV файла успешно загружен",
-      });
-    },
-    onError: (error) => {
-      console.error('Download error:', error);
-      toast({
-        title: "Ошибка загрузки",
-        description: "Не удалось загрузить образец файла",
-        variant: "destructive",
-      });
-    },
-  });
-};
+            toast({
+                title: 'Файл загружен',
+                description: 'Образец CSV файла успешно загружен',
+            })
+        },
+        onError: (error) => {
+            toast({
+                title: 'Ошибка загрузки',
+                description: 'Не удалось загрузить образец файла',
+                variant: 'destructive',
+            })
+        },
+    })
+}

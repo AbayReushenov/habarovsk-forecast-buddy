@@ -85,7 +85,6 @@ const Index = () => {
                     accuracy: sanitize(parsed.accuracy),
                 })
             } catch (e) {
-                console.warn('Failed to parse saved metrics, resetting to defaults', e)
                 setMetrics({ totalForecastSales: 0, avgWeeklySales: 0, trend: 0, accuracy: 0 })
             }
         }
@@ -121,9 +120,6 @@ const Index = () => {
         if (generateForecastMutation.data) {
             const result = generateForecastMutation.data
 
-            // DEBUG: log raw response
-            console.log('Forecast API raw result:', result)
-
             // Convert backend format to weekly aggregated forecast format
             const convertToSales = (p: any) => p?.predicted_sales ?? p?.predicted_units ?? p?.sales ?? 0
             const weeklyForecast: ForecastData[] = []
@@ -152,9 +148,6 @@ const Index = () => {
                     predicted_temp: avgTemp,
                 })
             }
-
-            // DEBUG: log weekly aggregated forecast
-            console.log('Weekly aggregated forecast:', weeklyForecast)
 
             // Use aggregated forecast for UI
             const convertedForecast: ForecastData[] = weeklyForecast
