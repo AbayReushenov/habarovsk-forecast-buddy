@@ -25,19 +25,22 @@ export interface ForecastRequest {
 }
 
 export interface ForecastResponse {
-  sku_id: string;
-  forecast_period: number;
-  generated_at: string;
-  predictions: Array<{
-    date: string;
-    predicted_units: number;
-    predicted_revenue: number;
-    confidence: number;
-  }>;
-  total_predicted_units: number;
-  total_predicted_revenue: number;
-  average_confidence: number;
-  model_explanation?: string;
+    sku_id: string
+    forecast_period: number
+    generated_at: string
+    predictions: Array<{
+        date: string
+        predicted_units?: number
+        predicted_sales?: number // new field from backend
+        predicted_revenue?: number
+        confidence: number
+        sales?: number // sometimes backend may return 'sales' in mock
+    }>
+    total_predicted_units?: number
+    total_predicted_sales?: number // aggregate when backend renamed field
+    total_predicted_revenue?: number
+    average_confidence: number
+    model_explanation?: string
 }
 
 export interface HealthResponse {

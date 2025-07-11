@@ -62,27 +62,49 @@ const Index = () => {
   }, []);
 
   const loadSavedData = () => {
-    const savedSalesData = localStorage.getItem('sales_data');
-    const savedForecastData = localStorage.getItem('forecast_data');
-    const savedMetrics = localStorage.getItem('metrics');
+      const savedSalesData = localStorage.getItem('sales_data')
+      const savedForecastData = localStorage.getItem('forecast_data')
+      const savedMetrics = localStorage.getItem('metrics')
 
-    if (savedSalesData) {
-      setSalesData(JSON.parse(savedSalesData));
-    }
-    if (savedForecastData) {
-      setForecastData(JSON.parse(savedForecastData));
-    }
-    if (savedMetrics) {
-      setMetrics(JSON.parse(savedMetrics));
-    }
-  };
+      if (savedSalesData) {
+          setSalesData(JSON.parse(savedSalesData))
+      }
+      if (savedForecastData) {
+          setForecastData(JSON.parse(savedForecastData))
+      }
+      if (savedMetrics) {
+          // Sanitize metrics to ensure we have numeric values
+          try {
+              const parsed = JSON.parse(savedMetrics)
+              const sanitize = (val: unknown) => (typeof val === 'number' && !isNaN(val) ? val : 0)
+              setMetrics({
+                  totalForecastSales: sanitize(parsed.totalForecastSales),
+                  avgWeeklySales: sanitize(parsed.avgWeeklySales),
+                  trend: sanitize(parsed.trend),
+                  accuracy: sanitize(parsed.accuracy),
+              })
+          } catch (e) {
+              console.warn('Failed to parse saved metrics, resetting to defaults', e)
+              setMetrics({ totalForecastSales: 0, avgWeeklySales: 0, trend: 0, accuracy: 0 })
+          }
+      }
+  }
 
-    const handleDataUpload = (data: SalesData[]) => {
-    // Keep local data for immediate UI update
-    // API upload is handled directly in DataUpload component
-    setSalesData(data);
-    localStorage.setItem('sales_data', JSON.stringify(data));
-  };
+  const handleDataUpload = (data: SalesData[]) => {
+      // Keep local data for immediate UI update
+      setSalesData(data)
+
+      // Persist uploaded sales data
+      localStorage.setItem('sales_data', JSON.stringify(data))
+
+      // Reset forecast-related state because base data changed
+      setForecastData([])
+      setMetrics({ totalForecastSales: 0, avgWeeklySales: 0, trend: 0, accuracy: 0 })
+
+      // Remove outdated cached values
+      localStorage.removeItem('forecast_data')
+      localStorage.removeItem('metrics')
+  }
 
     const generateForecast = async (promotions: string, priceChanges: string) => {
     // Use API to generate forecast
@@ -99,14 +121,15 @@ const Index = () => {
       const result = generateForecastMutation.data;
 
       // Convert backend format to frontend format
-      const convertedForecast: ForecastData[] = result.predictions.map(pred => ({
-        date: pred.date,
-        predicted_sales: pred.predicted_units,
-        confidence: pred.confidence,
-      }));
+      const convertedForecast: ForecastData[] = result.predictions.map((pred) => ({
+          date: pred.date,
+          predicted_sales: (pred as any).predicted_sales ?? (pred as any).predicted_units ?? (pred as any).sales ?? 0,
+          confidence: pred.confidence,
+      }))
 
       // Calculate metrics from response
-      const avgDailySales = result.total_predicted_units / result.forecast_period;
+      const totalForecastUnits = (result as any).total_predicted_sales ?? (result as any).total_predicted_units ?? 0
+      const avgDailySales = totalForecastUnits / result.forecast_period
       const trend = salesData.length > 0 ?
         ((avgDailySales - salesData.slice(-7).reduce((sum, item) => sum + item.sales_quantity, 0) / 7) /
          (salesData.slice(-7).reduce((sum, item) => sum + item.sales_quantity, 0) / 7)) * 100 : 0;
@@ -114,20 +137,23 @@ const Index = () => {
       // Update local state with API response
       setForecastData(convertedForecast);
       setMetrics({
-        totalForecastSales: result.total_predicted_units,
-        avgWeeklySales: avgDailySales * 7,
-        trend: trend,
-        accuracy: result.average_confidence * 100,
-      });
+          totalForecastSales: totalForecastUnits,
+          avgWeeklySales: avgDailySales * 7,
+          trend: trend,
+          accuracy: result.average_confidence * 100,
+      })
 
       // Save to localStorage for persistence
       localStorage.setItem('forecast_data', JSON.stringify(convertedForecast));
-      localStorage.setItem('metrics', JSON.stringify({
-        totalForecastSales: result.total_predicted_units,
-        avgWeeklySales: avgDailySales * 7,
-        trend: trend,
-        accuracy: result.average_confidence * 100,
-      }));
+      localStorage.setItem(
+          'metrics',
+          JSON.stringify({
+              totalForecastSales: totalForecastUnits,
+              avgWeeklySales: avgDailySales * 7,
+              trend: trend,
+              accuracy: result.average_confidence * 100,
+          })
+      )
     }
   }, [generateForecastMutation.data, salesData]);
 
