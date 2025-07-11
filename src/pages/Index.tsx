@@ -128,8 +128,15 @@ const Index = () => {
             if (slice.length === 0) continue
             const weekSales = slice.reduce((sum, cur) => sum + convertToSales(cur), 0)
             const avgConfidence = slice.reduce((sum, cur) => sum + (cur.confidence ?? 0), 0) / slice.length
+            let weekDate = new Date(slice[0].date)
+            const lastSalesDate = salesData.length > 0 ? new Date(salesData[salesData.length - 1].date) : null
+            if (lastSalesDate && weekDate <= lastSalesDate) {
+                // Shift one year ahead to reflect future forecast period
+                weekDate.setFullYear(weekDate.getFullYear() + 1)
+            }
+
             weeklyForecast.push({
-                date: slice[0].date, // первая дата недели
+                date: weekDate.toISOString().split('T')[0], // ISO yyyy-mm-dd
                 predicted_sales: weekSales,
                 confidence: avgConfidence,
             })
